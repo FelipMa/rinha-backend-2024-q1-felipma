@@ -1,0 +1,39 @@
+version: "3.5"
+name: "rinha-backend-2024-q1-felipma"
+
+services:
+  database:
+    hostname: dbhost
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: dbuser
+      POSTGRES_PASSWORD: dbpassword
+      POSTGRES_DB: dbname
+    ports:
+      - "5432:5432"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: "150MB"
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  instance1: &instance
+    image: rinha-backend-2024-q1-felipma:latest
+    depends_on:
+      - database
+    environment:
+      DATABASE_URL: "postgres://dbuser:dbpassword@dbhost:5432/dbname"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.40"
+          memory: "150MB"
+    ports:
+      - "8081:8080"
+
+  instance2:
+    <<: *instance
+    ports:
+      - "8082:8080"
