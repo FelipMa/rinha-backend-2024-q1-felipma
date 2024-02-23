@@ -1,5 +1,4 @@
 use crate::queries::Client;
-use chrono::{DateTime, Utc};
 use sqlx::Row;
 
 pub enum TransactionError {
@@ -13,7 +12,6 @@ pub async fn process_transaction(
     transaction_value: i32,
     transaction_type: String,
     transaction_description: String,
-    transaction_date: DateTime<Utc>,
     pool: &sqlx::PgPool,
 ) -> Result<Client, TransactionError> {
     let mut db_transaction = match pool.begin().await {
@@ -33,6 +31,7 @@ pub async fn process_transaction(
     } {
         Some(row) => row,
         None => {
+            db_transaction.commit().await.unwrap();
             return Err(TransactionError::ClientNotFound);
         }
     };
@@ -41,25 +40,25 @@ pub async fn process_transaction(
         && (client_row.get::<i32, _>("balance") - transaction_value)
             < -1 * client_row.get::<i32, _>("limit")
     {
+        db_transaction.commit().await.unwrap();
         return Err(TransactionError::InsufficientFunds);
     }
 
     match sqlx::query(
-        "INSERT INTO transactions (client_id, value, type, description, date) VALUES ($1, $2, $3, $4, $5)",
+        "INSERT INTO transactions (client_id, value, type, description) VALUES ($1, $2, $3, $4)",
     )
     .bind(&client_id)
     .bind(&transaction_value)
     .bind(&transaction_type)
     .bind(&transaction_description)
-    .bind(&transaction_date)
     .execute(&mut *db_transaction)
     .await
     {
         Ok(_) => {}
         Err(_) => {
             db_transaction.rollback().await.unwrap();
-            return Err(TransactionError::DatabaseError)
-        },
+            return Err(TransactionError::DatabaseError);
+        }
     }
 
     let operation = if transaction_type == "d" {

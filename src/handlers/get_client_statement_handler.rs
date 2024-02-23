@@ -1,11 +1,11 @@
 use crate::queries;
+use crate::queries::Statement;
 use axum::{
     body::Body,
     extract::{Path, State},
     http::StatusCode,
     response::Response,
 };
-use chrono::Utc;
 
 pub async fn get_client_statement(
     State(pool): State<sqlx::PgPool>,
@@ -21,9 +21,7 @@ pub async fn get_client_statement(
         }
     };
 
-    let now = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Micros, true);
-
-    let (client, transactions) =
+    let (saldo, transactions) =
         match queries::make_client_extract::make_client_extract(parsed_client_id, &pool).await {
             Ok((client, transactions)) => (client, transactions),
             Err(err) => match err {
@@ -41,25 +39,6 @@ pub async fn get_client_statement(
                 }
             },
         };
-
-    #[derive(serde::Serialize)]
-    struct Statement {
-        saldo: Saldo,
-        ultimas_transacoes: Vec<queries::make_client_extract::Transaction>,
-    }
-
-    #[derive(serde::Serialize)]
-    struct Saldo {
-        total: i32,
-        data_extrato: String,
-        limite: i32,
-    }
-
-    let saldo = Saldo {
-        total: client.balance,
-        data_extrato: now,
-        limite: client.limit,
-    };
 
     let statement = Statement {
         saldo,

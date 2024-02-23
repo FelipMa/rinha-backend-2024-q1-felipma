@@ -1,4 +1,4 @@
-use crate::queries::Client;
+use crate::queries::{Saldo, Transaction};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use sqlx::Row;
 
@@ -7,38 +7,32 @@ pub enum StatementError {
     DatabaseError,
 }
 
-#[derive(serde::Serialize)]
-pub struct Transaction {
-    pub valor: i32,
-    pub tipo: String,
-    pub descricao: String,
-    pub realizada_em: String,
-}
-
 pub async fn make_client_extract(
     client_id: i32,
     pool: &sqlx::PgPool,
-) -> Result<(Client, Vec<Transaction>), StatementError> {
+) -> Result<(Saldo, Vec<Transaction>), StatementError> {
     let mut db_transaction = match pool.begin().await {
         Ok(transaction) => transaction,
         Err(_) => return Err(StatementError::DatabaseError),
     };
 
-    let client_row = match match sqlx::query("SELECT * FROM clients WHERE id = $1")
-        .bind(&client_id)
-        .fetch_optional(&mut *db_transaction)
-        .await
-    {
-        Ok(opt) => opt,
-        Err(_) => {
-            return Err(StatementError::DatabaseError);
-        }
-    } {
-        Some(row) => row,
-        None => {
-            return Err(StatementError::ClientNotFound);
-        }
-    };
+    let client_row =
+        match match sqlx::query("SELECT *, NOW() as data_extrato FROM clients WHERE id = $1")
+            .bind(&client_id)
+            .fetch_optional(&mut *db_transaction)
+            .await
+        {
+            Ok(opt) => opt,
+            Err(_) => {
+                return Err(StatementError::DatabaseError);
+            }
+        } {
+            Some(row) => row,
+            None => {
+                db_transaction.commit().await.unwrap();
+                return Err(StatementError::ClientNotFound);
+            }
+        };
 
     let transaction_rows = match sqlx::query(
         "SELECT * FROM transactions WHERE client_id = $1 ORDER BY id DESC LIMIT 10",
@@ -74,9 +68,12 @@ pub async fn make_client_extract(
     }
 
     Ok((
-        Client {
-            balance: client_row.get("balance"),
-            limit: client_row.get("limit"),
+        Saldo {
+            total: client_row.get("balance"),
+            data_extrato: client_row
+                .get::<DateTime<Utc>, _>("data_extrato")
+                .to_rfc3339_opts(chrono::SecondsFormat::Micros, true),
+            limite: client_row.get("limit"),
         },
         transactions,
     ))

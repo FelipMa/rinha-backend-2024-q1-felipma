@@ -5,13 +5,12 @@ use axum::{
     http::StatusCode,
     response::Response,
 };
-use chrono::Utc;
 use serde_json::json;
 
 #[derive(serde::Deserialize)]
 pub struct CreateTransactionPayload {
     valor: i32,
-    tipo: char,
+    tipo: String,
     descricao: String,
 }
 
@@ -20,7 +19,17 @@ pub async fn post_client_transaction(
     Path(client_id): Path<String>,
     payload: Json<CreateTransactionPayload>,
 ) -> Response {
-    if payload.tipo != 'd' && payload.tipo != 'c' {
+    let parsed_client_id = match client_id.parse::<i32>() {
+        Ok(id) => id,
+        Err(_) => {
+            return Response::builder()
+                .status(StatusCode::UNPROCESSABLE_ENTITY)
+                .body(Body::empty())
+                .unwrap()
+        }
+    };
+
+    if payload.tipo != "d" && payload.tipo != "c" {
         return Response::builder()
             .status(StatusCode::UNPROCESSABLE_ENTITY)
             .body(Body::empty())
@@ -34,24 +43,11 @@ pub async fn post_client_transaction(
             .unwrap();
     }
 
-    let parsed_client_id = match client_id.parse::<i32>() {
-        Ok(id) => id,
-        Err(_) => {
-            return Response::builder()
-                .status(StatusCode::UNPROCESSABLE_ENTITY)
-                .body(Body::empty())
-                .unwrap()
-        }
-    };
-
-    let now = Utc::now();
-
     match queries::process_transaction::process_transaction(
         parsed_client_id,
         payload.valor,
-        payload.tipo.to_string(),
+        payload.tipo.clone(),
         payload.descricao.clone(),
-        now,
         &pool,
     )
     .await

@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS "transactions" (
     "value" INTEGER NOT NULL,
     "type" CHAR(1) NOT NULL,
     "description" VARCHAR(10) NOT NULL,
-    "date" TIMESTAMP NOT NULL,
+    "date" TIMESTAMP NOT NULL DEFAULT NOW(),
     "client_id" INTEGER NOT NULL,
     FOREIGN KEY ("client_id") REFERENCES "clients" ("id") ON DELETE CASCADE
 );
