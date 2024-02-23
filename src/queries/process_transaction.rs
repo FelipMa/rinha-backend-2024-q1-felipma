@@ -1,4 +1,4 @@
-use crate::queries::{get_connection_pool, Client};
+use crate::queries::Client;
 use chrono::{DateTime, Utc};
 use sqlx::Row;
 
@@ -14,12 +14,8 @@ pub async fn process_transaction(
     transaction_type: String,
     transaction_description: String,
     transaction_date: DateTime<Utc>,
+    pool: &sqlx::PgPool,
 ) -> Result<Client, TransactionError> {
-    let pool = match get_connection_pool().await {
-        Ok(pool) => pool,
-        Err(err) => return Err(TransactionError::DatabaseError(err.to_string())),
-    };
-
     let mut db_transaction = match pool.begin().await {
         Ok(transaction) => transaction,
         Err(err) => return Err(TransactionError::DatabaseError(err.to_string())),

@@ -1,4 +1,4 @@
-use crate::queries::{get_connection_pool, Client};
+use crate::queries::Client;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use sqlx::Row;
 
@@ -17,12 +17,8 @@ pub struct Transaction {
 
 pub async fn make_client_extract(
     client_id: i32,
+    pool: &sqlx::PgPool,
 ) -> Result<(Client, Vec<Transaction>), StatementError> {
-    let pool = match get_connection_pool().await {
-        Ok(pool) => pool,
-        Err(err) => return Err(StatementError::DatabaseError(err.to_string())),
-    };
-
     let mut db_transaction = match pool.begin().await {
         Ok(transaction) => transaction,
         Err(err) => return Err(StatementError::DatabaseError(err.to_string())),

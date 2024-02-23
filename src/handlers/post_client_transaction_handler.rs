@@ -1,7 +1,7 @@
 use crate::queries;
 use axum::{
     body::Body,
-    extract::{Json, Path},
+    extract::{Json, Path, State},
     http::StatusCode,
     response::Response,
 };
@@ -16,10 +16,18 @@ pub struct CreateTransactionPayload {
 }
 
 pub async fn post_client_transaction(
+    State(pool): State<sqlx::PgPool>,
     Path(client_id): Path<String>,
     payload: Json<CreateTransactionPayload>,
 ) -> Response {
     if payload.tipo != 'd' && payload.tipo != 'c' {
+        return Response::builder()
+            .status(StatusCode::UNPROCESSABLE_ENTITY)
+            .body(Body::empty())
+            .unwrap();
+    }
+
+    if payload.descricao.len() < 1 || payload.descricao.len() > 10 {
         return Response::builder()
             .status(StatusCode::UNPROCESSABLE_ENTITY)
             .body(Body::empty())
@@ -44,6 +52,7 @@ pub async fn post_client_transaction(
         payload.tipo.to_string(),
         payload.descricao.clone(),
         now,
+        &pool,
     )
     .await
     {
@@ -74,11 +83,11 @@ pub async fn post_client_transaction(
                     .body(Body::empty())
                     .unwrap()
             }
-            queries::process_transaction::TransactionError::DatabaseError(err) => {
+            queries::process_transaction::TransactionError::DatabaseError(_) => {
                 return Response::builder()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
-                    .body(err.into())
-                    .unwrap()
+                    .body(Body::empty())
+                    .unwrap();
             }
         },
     };

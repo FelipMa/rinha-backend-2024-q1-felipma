@@ -9,18 +9,16 @@ services:
       POSTGRES_USER: dbuser
       POSTGRES_PASSWORD: dbpassword
       POSTGRES_DB: dbname
-    ports:
-      - "5432:5432"
     deploy:
       resources:
         limits:
-          cpus: "0.50"
+          cpus: "0.7"
           memory: "150MB"
     volumes:
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
 
-  instance1: &instance
-    image: rinha-backend-2024-q1-felipma:latest
+  api01: &api
+    image: felipma/rinha-backend-2024-q1-felipma:latest
     depends_on:
       - database
     environment:
@@ -28,12 +26,23 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.40"
+          cpus: "0.3"
           memory: "150MB"
-    ports:
-      - "8081:8080"
 
-  instance2:
-    <<: *instance
+  api02:
+    <<: *api
+
+  nginx:
+    image: nginx:alpine
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api01
+      - api02
     ports:
-      - "8082:8080"
+      - "9999:9999"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: "100MB"

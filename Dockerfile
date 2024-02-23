@@ -8,6 +8,8 @@ ADD ./Cargo.toml .
 ADD ./Cargo.lock .
 ADD ./src ./src
 
-RUN cargo install --path .
+RUN cargo build --release
 
-CMD ["rinha-backend-2024-q1-felipma"]
+EXPOSE 8080
+
+CMD ["./target/release/rinha-backend-2024-q1-felipma"]

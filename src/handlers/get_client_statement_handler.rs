@@ -1,8 +1,16 @@
 use crate::queries;
-use axum::{body::Body, extract::Path, http::StatusCode, response::Response};
+use axum::{
+    body::Body,
+    extract::{Path, State},
+    http::StatusCode,
+    response::Response,
+};
 use chrono::Utc;
 
-pub async fn get_client_statement(Path(client_id): Path<String>) -> Response {
+pub async fn get_client_statement(
+    State(pool): State<sqlx::PgPool>,
+    Path(client_id): Path<String>,
+) -> Response {
     let parsed_client_id = match client_id.parse::<i32>() {
         Ok(id) => id,
         Err(_) => {
@@ -16,7 +24,7 @@ pub async fn get_client_statement(Path(client_id): Path<String>) -> Response {
     let now = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Micros, true);
 
     let (client, transactions) =
-        match queries::make_client_extract::make_client_extract(parsed_client_id).await {
+        match queries::make_client_extract::make_client_extract(parsed_client_id, &pool).await {
             Ok((client, transactions)) => (client, transactions),
             Err(err) => match err {
                 queries::make_client_extract::StatementError::ClientNotFound => {
@@ -25,10 +33,10 @@ pub async fn get_client_statement(Path(client_id): Path<String>) -> Response {
                         .body(Body::empty())
                         .unwrap()
                 }
-                queries::make_client_extract::StatementError::DatabaseError(err) => {
+                queries::make_client_extract::StatementError::DatabaseError(_) => {
                     return Response::builder()
                         .status(StatusCode::INTERNAL_SERVER_ERROR)
-                        .body(err.into())
+                        .body(Body::empty())
                         .unwrap()
                 }
             },
