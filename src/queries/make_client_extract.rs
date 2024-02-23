@@ -4,7 +4,7 @@ use sqlx::Row;
 
 pub enum StatementError {
     ClientNotFound,
-    DatabaseError(String),
+    DatabaseError,
 }
 
 #[derive(serde::Serialize)]
@@ -21,7 +21,7 @@ pub async fn make_client_extract(
 ) -> Result<(Client, Vec<Transaction>), StatementError> {
     let mut db_transaction = match pool.begin().await {
         Ok(transaction) => transaction,
-        Err(err) => return Err(StatementError::DatabaseError(err.to_string())),
+        Err(_) => return Err(StatementError::DatabaseError),
     };
 
     let client_row = match match sqlx::query("SELECT * FROM clients WHERE id = $1")
@@ -30,10 +30,14 @@ pub async fn make_client_extract(
         .await
     {
         Ok(opt) => opt,
-        Err(err) => return Err(StatementError::DatabaseError(err.to_string())),
+        Err(_) => {
+            return Err(StatementError::DatabaseError);
+        }
     } {
         Some(row) => row,
-        None => return Err(StatementError::ClientNotFound),
+        None => {
+            return Err(StatementError::ClientNotFound);
+        }
     };
 
     let transaction_rows = match sqlx::query(
@@ -44,7 +48,9 @@ pub async fn make_client_extract(
     .await
     {
         Ok(rows) => rows,
-        Err(err) => return Err(StatementError::DatabaseError(err.to_string())),
+        Err(_) => {
+            return Err(StatementError::DatabaseError);
+        }
     };
 
     let mut transactions = Vec::new();
@@ -60,6 +66,11 @@ pub async fn make_client_extract(
             )
             .to_rfc3339_opts(chrono::SecondsFormat::Micros, true),
         });
+    }
+
+    match db_transaction.commit().await {
+        Ok(_) => {}
+        Err(_) => return Err(StatementError::DatabaseError),
     }
 
     Ok((

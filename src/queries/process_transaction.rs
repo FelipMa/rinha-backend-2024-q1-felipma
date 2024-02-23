@@ -5,7 +5,7 @@ use sqlx::Row;
 pub enum TransactionError {
     InsufficientFunds,
     ClientNotFound,
-    DatabaseError(String),
+    DatabaseError,
 }
 
 pub async fn process_transaction(
@@ -18,7 +18,7 @@ pub async fn process_transaction(
 ) -> Result<Client, TransactionError> {
     let mut db_transaction = match pool.begin().await {
         Ok(transaction) => transaction,
-        Err(err) => return Err(TransactionError::DatabaseError(err.to_string())),
+        Err(_) => return Err(TransactionError::DatabaseError),
     };
 
     let client_row = match match sqlx::query("SELECT * FROM clients WHERE id = $1")
@@ -27,10 +27,14 @@ pub async fn process_transaction(
         .await
     {
         Ok(opt) => opt,
-        Err(err) => return Err(TransactionError::DatabaseError(err.to_string())),
+        Err(_) => {
+            return Err(TransactionError::DatabaseError);
+        }
     } {
         Some(row) => row,
-        None => return Err(TransactionError::ClientNotFound),
+        None => {
+            return Err(TransactionError::ClientNotFound);
+        }
     };
 
     if transaction_type == "d"
@@ -52,8 +56,11 @@ pub async fn process_transaction(
     .await
     {
         Ok(_) => {}
-        Err(err) => return Err(TransactionError::DatabaseError(err.to_string())),
-    };
+        Err(_) => {
+            db_transaction.rollback().await.unwrap();
+            return Err(TransactionError::DatabaseError)
+        },
+    }
 
     let operation = if transaction_type == "d" {
         -1 * transaction_value
@@ -69,12 +76,15 @@ pub async fn process_transaction(
             .await
         {
             Ok(row) => row,
-            Err(err) => return Err(TransactionError::DatabaseError(err.to_string())),
+            Err(_) => {
+                db_transaction.rollback().await.unwrap();
+                return Err(TransactionError::DatabaseError);
+            }
         };
 
     match db_transaction.commit().await {
         Ok(_) => {}
-        Err(err) => return Err(TransactionError::DatabaseError(err.to_string())),
+        Err(_) => return Err(TransactionError::DatabaseError),
     }
 
     return Ok(Client {

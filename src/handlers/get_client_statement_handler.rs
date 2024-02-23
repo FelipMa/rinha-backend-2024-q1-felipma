@@ -33,7 +33,7 @@ pub async fn get_client_statement(
                         .body(Body::empty())
                         .unwrap()
                 }
-                queries::make_client_extract::StatementError::DatabaseError(_) => {
+                queries::make_client_extract::StatementError::DatabaseError => {
                     return Response::builder()
                         .status(StatusCode::INTERNAL_SERVER_ERROR)
                         .body(Body::empty())
