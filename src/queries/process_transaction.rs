@@ -19,7 +19,7 @@ pub async fn process_transaction(
         Err(_) => return Err(TransactionError::DatabaseError),
     };
 
-    let client_row = match match sqlx::query("SELECT * FROM clients WHERE id = $1")
+    match match sqlx::query("SELECT * FROM clients WHERE id = $1")
         .bind(&client_id)
         .fetch_optional(&mut *db_transaction)
         .await
@@ -29,21 +29,41 @@ pub async fn process_transaction(
             return Err(TransactionError::DatabaseError);
         }
     } {
-        Some(row) => row,
+        Some(_) => {},
         None => {
             db_transaction.commit().await.unwrap();
             return Err(TransactionError::ClientNotFound);
         }
     };
 
-    if transaction_type == "d"
-        && (client_row.get::<i32, _>("balance") - transaction_value)
-            < -1 * client_row.get::<i32, _>("limit")
+    let operation = if transaction_type == "d" {
+        -1 * transaction_value
+    } else {
+        transaction_value
+    };
+    
+    let updated_client_row =
+    match sqlx::query("UPDATE clients SET balance = balance + $1 WHERE id = $2 RETURNING *")
+    .bind(&operation)
+    .bind(&client_id)
+    .fetch_one(&mut *db_transaction)
+    .await
     {
-        db_transaction.commit().await.unwrap();
-        return Err(TransactionError::InsufficientFunds);
-    }
-
+        Ok(row) => {
+            if transaction_type == "d"
+                && row.get::<i32, _>("balance") < -1 * row.get::<i32, _>("limit")
+            {
+                db_transaction.rollback().await.unwrap();
+                return Err(TransactionError::InsufficientFunds);
+            }
+            row
+        },
+        Err(_) => {
+            db_transaction.rollback().await.unwrap();
+            return Err(TransactionError::DatabaseError);
+        }
+    };
+    
     match sqlx::query(
         "INSERT INTO transactions (client_id, value, type, description) VALUES ($1, $2, $3, $4)",
     )
@@ -60,26 +80,6 @@ pub async fn process_transaction(
             return Err(TransactionError::DatabaseError);
         }
     }
-
-    let operation = if transaction_type == "d" {
-        -1 * transaction_value
-    } else {
-        transaction_value
-    };
-
-    let updated_client_row =
-        match sqlx::query("UPDATE clients SET balance = balance + $1 WHERE id = $2 RETURNING *")
-            .bind(&operation)
-            .bind(&client_id)
-            .fetch_one(&mut *db_transaction)
-            .await
-        {
-            Ok(row) => row,
-            Err(_) => {
-                db_transaction.rollback().await.unwrap();
-                return Err(TransactionError::DatabaseError);
-            }
-        };
 
     match db_transaction.commit().await {
         Ok(_) => {}
