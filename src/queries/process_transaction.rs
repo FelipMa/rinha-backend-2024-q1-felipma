@@ -3,7 +3,6 @@ use sqlx::Row;
 
 pub enum TransactionError {
     InsufficientFunds,
-    ClientNotFound,
     DatabaseError,
 }
 
@@ -19,7 +18,7 @@ pub async fn process_transaction(
         Err(_) => return Err(TransactionError::DatabaseError),
     };
 
-    match match sqlx::query("SELECT * FROM clients WHERE id = $1")
+    /*match match sqlx::query("SELECT * FROM clients WHERE id = $1")
         .bind(&client_id)
         .fetch_optional(&mut *db_transaction)
         .await
@@ -34,7 +33,7 @@ pub async fn process_transaction(
             db_transaction.commit().await.unwrap();
             return Err(TransactionError::ClientNotFound);
         }
-    };
+    };*/
 
     let operation = if transaction_type == "d" {
         -1 * transaction_value

@@ -73,12 +73,6 @@ pub async fn post_client_transaction(
                     .body(Body::empty())
                     .unwrap()
             }
-            queries::process_transaction::TransactionError::ClientNotFound => {
-                return Response::builder()
-                    .status(StatusCode::NOT_FOUND)
-                    .body(Body::empty())
-                    .unwrap()
-            }
             queries::process_transaction::TransactionError::DatabaseError => {
                 return Response::builder()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)

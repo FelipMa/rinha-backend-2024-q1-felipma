@@ -11,7 +11,7 @@ async fn main() {
     let connection_string = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
 
     let pool = PgPoolOptions::new()
-        .max_connections(20)
+        .max_connections(60)
         .connect(&connection_string)
         .await
         .expect("Failed to create connection pool");
@@ -27,7 +27,7 @@ async fn main() {
         )
         .with_state(pool);
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await.unwrap();
+    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", std::env::var("PORT").expect("PORT not set"))).await.unwrap();
 
     axum::serve(listener, app.into_make_service())
         .await

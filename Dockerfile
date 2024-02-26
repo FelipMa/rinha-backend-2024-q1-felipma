@@ -10,6 +10,4 @@ ADD ./src ./src
 
 RUN cargo build --release
 
-EXPOSE 8080
-
 CMD ["./target/release/rinha-backend-2024-q1-felipma"]
