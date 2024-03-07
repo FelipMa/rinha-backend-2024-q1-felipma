@@ -11,13 +11,6 @@ pub async fn get_client_statement(
     State(pool): State<sqlx::PgPool>,
     Path(client_id): Path<String>,
 ) -> Response {
-    if client_id == "6" {
-        return Response::builder()
-            .status(StatusCode::NOT_FOUND)
-            .body(Body::empty())
-            .unwrap()
-    }
-
     let parsed_client_id = match client_id.parse::<i32>() {
         Ok(id) => id,
         Err(_) => {
